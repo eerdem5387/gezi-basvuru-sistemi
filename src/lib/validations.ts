@@ -6,29 +6,47 @@ const numericString = z
   .transform((val) => Number(val))
 
 const optionalNumeric = z
-  .union([z.number(), numericString])
+  .union([z.number(), z.string(), z.null()])
   .optional()
+  .nullable()
   .transform((value) => {
-    if (value === undefined || value === null) {
-      return undefined
+    if (value === undefined || value === null || value === "") {
+      return null
     }
-    return typeof value === "number" ? value : Number(value)
+    if (typeof value === "number") {
+      return isNaN(value) ? null : value
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim()
+      if (trimmed === "" || trimmed === "null" || trimmed === "undefined") {
+        return null
+      }
+      const num = Number(trimmed)
+      return isNaN(num) ? null : num
+    }
+    return null
   })
 
 const optionalInteger = z
-  .union([
-    z.number().int(),
-    z
-      .string()
-      .regex(/^\d+$/, "Geçerli bir sayı giriniz")
-      .transform((val) => Number(val)),
-  ])
+  .union([z.number(), z.string(), z.null()])
   .optional()
+  .nullable()
   .transform((value) => {
-    if (value === undefined || value === null) {
-      return undefined
+    if (value === undefined || value === null || value === "") {
+      return null
     }
-    return typeof value === "number" ? value : Number(value)
+    if (typeof value === "number") {
+      return isNaN(value) ? null : Math.floor(value)
+    }
+    if (typeof value === "string") {
+      const trimmed = value.trim()
+      if (trimmed === "" || trimmed === "null" || trimmed === "undefined") {
+        return null
+      }
+      const num = Number(trimmed)
+      return isNaN(num) ? null : Math.floor(num)
+    }
+    return null
   })
 
 const dateString = z

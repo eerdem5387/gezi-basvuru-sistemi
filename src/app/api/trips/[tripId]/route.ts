@@ -104,6 +104,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 
     const data = parsed.data
     const updateData: Record<string, unknown> = {}
+    
+    // Type helper for price
+    type PriceValue = number | string | null | undefined
 
     if (Object.prototype.hasOwnProperty.call(data, "title")) {
       if (typeof data.title !== "string" || !data.title.trim()) {
@@ -150,13 +153,31 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     
     if (Object.prototype.hasOwnProperty.call(data, "price")) {
-      const priceValue = data.price
-      if (priceValue !== null && priceValue !== undefined) {
-        // Check if it's an empty string (from form submission)
-        const priceStr = String(priceValue).trim()
-        if (priceStr !== "" && priceStr !== "null" && priceStr !== "undefined") {
+      const priceValue: PriceValue = data.price as PriceValue
+      
+      if (priceValue === null || priceValue === undefined) {
+        updateData.price = null
+      } else if (typeof priceValue === "string") {
+        const trimmed = priceValue.trim()
+        if (trimmed === "" || trimmed === "null" || trimmed === "undefined") {
+          updateData.price = null
+        } else {
+          const priceNum = Number(trimmed)
+          if (!isNaN(priceNum) && priceNum > 0) {
+            try {
+              updateData.price = new Prisma.Decimal(priceNum)
+            } catch (decimalError) {
+              console.error("Error converting price to Decimal:", decimalError)
+              return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+            }
+          } else {
+            updateData.price = null
+          }
+        }
+      } else if (typeof priceValue === "number") {
+        if (!isNaN(priceValue) && priceValue > 0) {
           try {
-            updateData.price = new Prisma.Decimal(priceStr)
+            updateData.price = new Prisma.Decimal(priceValue)
           } catch (decimalError) {
             console.error("Error converting price to Decimal:", decimalError)
             return badRequestResponse("Geçersiz ücret formatı", undefined, request)

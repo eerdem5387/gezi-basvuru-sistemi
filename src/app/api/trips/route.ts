@@ -124,12 +124,31 @@ export async function POST(request: NextRequest) {
     try {
       // Prepare price as Decimal if provided
       let priceValue: Prisma.Decimal | null = null
-      if (data.price !== null && data.price !== undefined) {
-        try {
-          priceValue = new Prisma.Decimal(String(data.price))
-        } catch (decimalError) {
-          console.error("Error converting price to Decimal:", decimalError)
-          return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+      const price: number | string | null | undefined = data.price as number | string | null | undefined
+      
+      if (price !== null && price !== undefined) {
+        if (typeof price === "string") {
+          const trimmed = price.trim()
+          if (trimmed !== "" && trimmed !== "null" && trimmed !== "undefined") {
+            const priceNum = Number(trimmed)
+            if (!isNaN(priceNum) && priceNum > 0) {
+              try {
+                priceValue = new Prisma.Decimal(priceNum)
+              } catch (decimalError) {
+                console.error("Error converting price to Decimal:", decimalError)
+                return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+              }
+            }
+          }
+        } else if (typeof price === "number") {
+          if (!isNaN(price) && price > 0) {
+            try {
+              priceValue = new Prisma.Decimal(price)
+            } catch (decimalError) {
+              console.error("Error converting price to Decimal:", decimalError)
+              return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+            }
+          }
         }
       }
 
