@@ -33,13 +33,11 @@ export function unauthorizedResponse(request?: NextRequest) {
 }
 
 export function badRequestResponse(message: string, details?: unknown, request?: NextRequest) {
-  const response = NextResponse.json(
-    {
-      error: message,
-      ...(details && { details }),
-    },
-    { status: 400 }
-  )
+  const responseBody: { error: string; details?: unknown } = { error: message }
+  if (details) {
+    responseBody.details = details
+  }
+  const response = NextResponse.json(responseBody, { status: 400 })
   return request ? addCorsHeaders(response, request) : response
 }
 
