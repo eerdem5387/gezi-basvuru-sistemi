@@ -47,7 +47,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return response
     }
 
-    const response = NextResponse.json({ data: trip })
+    // Convert Decimal to number for JSON serialization
+    const tripWithNumber = {
+      ...trip,
+      price: trip.price ? Number(trip.price) : null,
+    }
+
+    const response = NextResponse.json({ data: tripWithNumber })
     const origin = request.headers.get("origin")
     const allowedOrigins = [
       "https://okul-yonetim-sistemi.vercel.app",
@@ -144,8 +150,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     
     if (Object.prototype.hasOwnProperty.call(data, "price")) {
-      if (data.price !== null && data.price !== undefined) {
-        updateData.price = new Prisma.Decimal(data.price)
+      if (data.price !== null && data.price !== undefined && data.price !== "") {
+        try {
+          updateData.price = new Prisma.Decimal(String(data.price))
+        } catch (decimalError) {
+          console.error("Error converting price to Decimal:", decimalError)
+          return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+        }
       } else {
         updateData.price = null
       }
@@ -172,7 +183,13 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         },
       })
 
-      const response = NextResponse.json({ data: trip })
+      // Convert Decimal to number for JSON serialization
+      const tripWithNumber = {
+        ...trip,
+        price: trip.price ? Number(trip.price) : null,
+      }
+
+      const response = NextResponse.json({ data: tripWithNumber })
       const origin = request.headers.get("origin")
       const allowedOrigins = [
         "https://okul-yonetim-sistemi.vercel.app",
@@ -186,6 +203,9 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       }
       return response
     } catch (dbError) {
+      console.error("Database error updating trip:", dbError)
+      
+      // Check for record not found
       if (
         typeof dbError === "object" &&
         dbError !== null &&
@@ -206,10 +226,27 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         }
         return response
       }
-      throw dbError
+      
+      // Log full error details
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      const errorStack = dbError instanceof Error ? dbError.stack : undefined
+      console.error("Full error message:", errorMessage)
+      console.error("Error stack:", errorStack)
+      
+      // Return error with details for debugging (in development)
+      if (process.env.NODE_ENV === "development") {
+        return badRequestResponse(
+          `Gezi güncellenemedi: ${errorMessage}`,
+          { stack: errorStack },
+          request
+        )
+      }
+      
+      return badRequestResponse("Gezi güncellenemedi", undefined, request)
     }
   } catch (error) {
     console.error("Error updating trip:", error)
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return serverErrorResponse(error, request)
   }
 }

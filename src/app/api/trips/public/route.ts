@@ -17,7 +17,13 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const response = NextResponse.json({ data: trips })
+    // Convert Decimal to number for JSON serialization
+    const tripsWithNumbers = trips.map((trip) => ({
+      ...trip,
+      price: trip.price ? Number(trip.price) : null,
+    }))
+
+    const response = NextResponse.json({ data: tripsWithNumbers })
     // Public endpoint, allow CORS for all origins
     response.headers.set("Access-Control-Allow-Origin", "*")
     response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS")

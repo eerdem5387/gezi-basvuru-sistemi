@@ -51,7 +51,13 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    const response = NextResponse.json({ data: trips })
+    // Convert Decimal to number for JSON serialization
+    const tripsWithNumbers = trips.map((trip) => ({
+      ...trip,
+      price: trip.price ? Number(trip.price) : null,
+    }))
+
+    const response = NextResponse.json({ data: tripsWithNumbers })
     const origin = request.headers.get("origin")
     const allowedOrigins = [
       "https://okul-yonetim-sistemi.vercel.app",
@@ -116,6 +122,17 @@ export async function POST(request: NextRequest) {
     }
 
     try {
+      // Prepare price as Decimal if provided
+      let priceValue: Prisma.Decimal | null = null
+      if (data.price !== null && data.price !== undefined) {
+        try {
+          priceValue = new Prisma.Decimal(String(data.price))
+        } catch (decimalError) {
+          console.error("Error converting price to Decimal:", decimalError)
+          return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+        }
+      }
+
       const trip = await prisma.trip.create({
         data: {
           title: data.title.trim(),
@@ -124,7 +141,7 @@ export async function POST(request: NextRequest) {
           location: data.location.trim(),
           startDate,
           endDate,
-          price: data.price !== null && data.price !== undefined ? new Prisma.Decimal(data.price) : null,
+          price: priceValue,
           quota: data.quota ?? null,
           isActive: data.isActive ?? true,
         },
@@ -136,8 +153,10 @@ export async function POST(request: NextRequest) {
       })
 
       // Add _count to trip object
+      // Convert Decimal to number for JSON serialization
       const tripWithCount = {
         ...trip,
+        price: trip.price ? Number(trip.price) : null,
         _count: {
           applications: applicationCount,
         },
@@ -163,7 +182,7 @@ export async function POST(request: NextRequest) {
       return response
     } catch (dbError) {
       console.error("Database error creating trip:", dbError)
-      console.error("Error details:", JSON.stringify(dbError, null, 2))
+      
       // Check for unique constraint violations
       if (
         typeof dbError === "object" &&
@@ -173,10 +192,23 @@ export async function POST(request: NextRequest) {
       ) {
         return badRequestResponse("Bu gezi zaten mevcut", undefined, request)
       }
-      // Return more detailed error for debugging
-      const errorMessage = dbError instanceof Error ? dbError.message : "Veritabanı hatası"
-      console.error("Full error:", errorMessage)
-      return badRequestResponse(`Gezi oluşturulamadı: ${errorMessage}`, undefined, request)
+      
+      // Log full error details
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError)
+      const errorStack = dbError instanceof Error ? dbError.stack : undefined
+      console.error("Full error message:", errorMessage)
+      console.error("Error stack:", errorStack)
+      
+      // Return error with details for debugging (in development)
+      if (process.env.NODE_ENV === "development") {
+        return badRequestResponse(
+          `Gezi oluşturulamadı: ${errorMessage}`,
+          { stack: errorStack },
+          request
+        )
+      }
+      
+      return badRequestResponse("Gezi oluşturulamadı", undefined, request)
     }
   } catch (error) {
     console.error("Error creating trip:", error)
