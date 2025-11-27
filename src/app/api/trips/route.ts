@@ -75,48 +75,89 @@ export async function POST(request: NextRequest) {
       return unauthorizedResponse(request)
     }
 
-    const payload = await request.json()
+    let payload: unknown
+    try {
+      payload = await request.json()
+    } catch (jsonError) {
+      console.error("JSON parse error:", jsonError)
+      return badRequestResponse("Geçersiz JSON formatı", undefined, request)
+    }
+
+    if (!payload || typeof payload !== "object") {
+      return badRequestResponse("Geçersiz veri formatı", undefined, request)
+    }
+
     const parsed = createTripSchema.safeParse(payload)
 
     if (!parsed.success) {
+      console.error("Validation error:", parsed.error.flatten())
       return badRequestResponse("Gezi verisi doğrulanamadı", parsed.error.flatten(), request)
     }
 
     const data = parsed.data
 
-    const trip = await prisma.trip.create({
-      data: {
-        title: data.title,
-        description: data.description ?? null,
-        extraNotes: data.extraNotes ?? null,
-        location: data.location,
-        startDate: new Date(data.startDate),
-        endDate: new Date(data.endDate),
-        price: data.price,
-        quota: data.quota,
-        isActive: data.isActive ?? true,
-      },
-    })
-
-    const response = NextResponse.json({ data: trip }, { status: 201 })
-    const origin = request.headers.get("origin")
-    const allowedOrigins = [
-      "https://okul-yonetim-sistemi.vercel.app",
-      "https://yonetim.leventokullari.com",
-      "http://localhost:3000",
-      "http://localhost:3001",
-    ]
-    if (origin && allowedOrigins.includes(origin)) {
-      response.headers.set("Access-Control-Allow-Origin", origin)
-      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
-      response.headers.set(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Service-Secret"
-      )
-      response.headers.set("Access-Control-Allow-Credentials", "true")
+    // Validate dates one more time
+    const startDate = new Date(data.startDate)
+    const endDate = new Date(data.endDate)
+    
+    if (isNaN(startDate.getTime())) {
+      return badRequestResponse("Geçersiz başlangıç tarihi", undefined, request)
     }
-    return response
+    if (isNaN(endDate.getTime())) {
+      return badRequestResponse("Geçersiz bitiş tarihi", undefined, request)
+    }
+    if (endDate < startDate) {
+      return badRequestResponse("Bitiş tarihi başlangıç tarihinden önce olamaz", undefined, request)
+    }
+
+    try {
+      const trip = await prisma.trip.create({
+        data: {
+          title: data.title.trim(),
+          description: data.description ?? null,
+          extraNotes: data.extraNotes ?? null,
+          location: data.location.trim(),
+          startDate,
+          endDate,
+          price: data.price ?? null,
+          quota: data.quota ?? null,
+          isActive: data.isActive ?? true,
+        },
+      })
+
+      const response = NextResponse.json({ data: trip }, { status: 201 })
+      const origin = request.headers.get("origin")
+      const allowedOrigins = [
+        "https://okul-yonetim-sistemi.vercel.app",
+        "https://yonetim.leventokullari.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+      ]
+      if (origin && allowedOrigins.includes(origin)) {
+        response.headers.set("Access-Control-Allow-Origin", origin)
+        response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+        response.headers.set(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization, X-Service-Secret"
+        )
+        response.headers.set("Access-Control-Allow-Credentials", "true")
+      }
+      return response
+    } catch (dbError) {
+      console.error("Database error:", dbError)
+      // Check for unique constraint violations
+      if (
+        typeof dbError === "object" &&
+        dbError !== null &&
+        "code" in dbError &&
+        dbError.code === "P2002"
+      ) {
+        return badRequestResponse("Bu gezi zaten mevcut", undefined, request)
+      }
+      throw dbError
+    }
   } catch (error) {
+    console.error("Error creating trip:", error)
     return serverErrorResponse(error, request)
   }
 }

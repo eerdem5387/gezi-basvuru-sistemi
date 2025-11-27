@@ -16,6 +16,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const { tripId } = await context.params
+    
+    if (!tripId || typeof tripId !== "string") {
+      return badRequestResponse("Geçersiz gezi ID", undefined, request)
+    }
+
     const trip = await prisma.trip.findUnique({
       where: { id: tripId },
     })
@@ -36,53 +41,64 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return response
     }
 
-    const applications = await prisma.tripApplication.findMany({
-      where: { tripId },
-      orderBy: { createdAt: "asc" },
-    })
+    try {
+      const applications = await prisma.tripApplication.findMany({
+        where: { tripId },
+        orderBy: { createdAt: "asc" },
+      })
 
-    const rows = applications.map((app) => ({
-      "Başvuru ID": app.id,
-      "Öğrenci Adı": app.ogrenciAdSoyad,
-      "Öğrenci Sınıfı": app.ogrenciSinifi,
-      "Veli Adı": app.veliAdSoyad,
-      "Veli Telefon": app.veliTelefon,
-      "Öğrenci Telefonu": app.ogrenciTelefon,
-      Durum: app.status,
-      "Başvuru Tarihi": app.createdAt.toISOString(),
-    }))
+      const rows = applications.map((app) => ({
+        "Başvuru ID": app.id,
+        "Öğrenci Adı": app.ogrenciAdSoyad,
+        "Öğrenci Sınıfı": app.ogrenciSinifi,
+        "Veli Adı": app.veliAdSoyad,
+        "Veli Telefon": app.veliTelefon,
+        "Öğrenci Telefonu": app.ogrenciTelefon,
+        Durum: app.status,
+        "Başvuru Tarihi": app.createdAt.toISOString(),
+      }))
 
-    const workbook = XLSX.utils.book_new()
-    const worksheet = XLSX.utils.json_to_sheet(rows)
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Basvurular")
+      const workbook = XLSX.utils.book_new()
+      const worksheet = XLSX.utils.json_to_sheet(rows)
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Basvurular")
 
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })
-    const filename = `gezi-${trip.title.replace(/\s+/g, "-").toLowerCase()}-basvurular.xlsx`
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })
+      
+      if (!buffer || buffer.length === 0) {
+        throw new Error("Excel dosyası oluşturulamadı")
+      }
+      
+      const filename = `gezi-${trip.title.replace(/\s+/g, "-").toLowerCase()}-basvurular.xlsx`
 
-    const origin = request.headers.get("origin")
-    const allowedOrigins = [
-      "https://okul-yonetim-sistemi.vercel.app",
-      "https://yonetim.leventokullari.com",
-      "http://localhost:3000",
-      "http://localhost:3001",
-    ]
+      const origin = request.headers.get("origin")
+      const allowedOrigins = [
+        "https://okul-yonetim-sistemi.vercel.app",
+        "https://yonetim.leventokullari.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+      ]
 
-    const headers: Record<string, string> = {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      const headers: Record<string, string> = {
+        "Content-Type":
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      }
+
+      if (origin && allowedOrigins.includes(origin)) {
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+      }
+
+      return new NextResponse(buffer, {
+        status: 200,
+        headers,
+      })
+    } catch (xlsxError) {
+      console.error("Excel generation error:", xlsxError)
+      throw xlsxError
     }
-
-    if (origin && allowedOrigins.includes(origin)) {
-      headers["Access-Control-Allow-Origin"] = origin
-      headers["Access-Control-Allow-Credentials"] = "true"
-    }
-
-    return new NextResponse(buffer, {
-      status: 200,
-      headers,
-    })
   } catch (error) {
+    console.error("Error exporting applications:", error)
     return serverErrorResponse(error, request)
   }
 }

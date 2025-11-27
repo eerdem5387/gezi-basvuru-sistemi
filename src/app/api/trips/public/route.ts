@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { serverErrorResponse } from "@/lib/http"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const now = new Date()
     const trips = await prisma.trip.findMany({
@@ -17,9 +17,13 @@ export async function GET() {
       },
     })
 
-    return NextResponse.json({ data: trips })
+    const response = NextResponse.json({ data: trips })
+    // Public endpoint, allow CORS for all origins
+    response.headers.set("Access-Control-Allow-Origin", "*")
+    response.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS")
+    return response
   } catch (error) {
-    return serverErrorResponse(error)
+    console.error("Error fetching public trips:", error)
+    return serverErrorResponse(error, request)
   }
 }
-
