@@ -39,6 +39,7 @@ export default function HomePage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [success, setSuccess] = useState(false)
+  const [studentSearchError, setStudentSearchError] = useState(false)
 
   useEffect(() => {
     fetchActiveTrip()
@@ -78,21 +79,60 @@ export default function HomePage() {
 
   const fetchStudents = async (search: string) => {
     try {
-      // Use environment variable or fallback to production URL
-      // In Next.js, NEXT_PUBLIC_ variables are available in client components
-      const YONETIM_API_URL = "https://yonetim.leventokullari.com"
+      // Try multiple API URLs as fallback
+      const apiUrls = [
+        process.env.NEXT_PUBLIC_YONETIM_API_URL,
+        "https://yonetim.leventokullari.com",
+        "https://okul-yonetim-sistemi.vercel.app",
+      ].filter(Boolean) as string[]
 
-      const response = await fetch(
-        `${YONETIM_API_URL}/api/students/public?search=${encodeURIComponent(search)}`
-      )
-      if (!response.ok) {
-        throw new Error("Öğrenci listesi alınamadı")
+      let lastError: Error | null = null
+      
+      for (const apiUrl of apiUrls) {
+        try {
+          // Create abort controller for timeout
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+          
+          const response = await fetch(
+            `${apiUrl}/api/students/public?search=${encodeURIComponent(search)}`,
+            {
+              method: "GET",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              signal: controller.signal,
+            }
+          )
+          
+          clearTimeout(timeoutId)
+          
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+          }
+          
+          const result = await response.json()
+          setStudents(result.data || [])
+          setStudentSearchError(false) // Clear error on success
+          return // Success, exit early
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err))
+          // Only log non-abort errors
+          if (err instanceof Error && err.name !== "AbortError") {
+            console.warn(`Failed to fetch from ${apiUrl}:`, lastError.message)
+          }
+          // Continue to next URL
+          continue
+        }
       }
-      const result = await response.json()
-      setStudents(result.data || [])
+      
+      // All URLs failed
+      setStudents([])
+      setStudentSearchError(true)
     } catch (error) {
       console.error("Error fetching students:", error)
       setStudents([])
+      setStudentSearchError(true)
     }
   }
 
@@ -259,6 +299,11 @@ export default function HomePage() {
                 <p className="text-xs text-slate-500 mb-2">
                   Öğrenci adı soyadı ile arayarak listeden seçebilirsiniz. Seçmezseniz manuel olarak girebilirsiniz.
                 </p>
+                {studentSearchError && searchTerm.length >= 2 && (
+                  <p className="text-xs text-amber-600 mb-2">
+                    ⚠️ Öğrenci listesi şu anda yüklenemiyor. Lütfen bilgileri manuel olarak giriniz.
+                  </p>
+                )}
                 <div className="relative">
                   <input
                     type="text"
