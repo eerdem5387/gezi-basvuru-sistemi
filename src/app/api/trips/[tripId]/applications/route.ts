@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client"
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { validateServiceRequest } from "@/lib/service-auth"
-import { serverErrorResponse, unauthorizedResponse } from "@/lib/http"
+import { badRequestResponse, serverErrorResponse, unauthorizedResponse } from "@/lib/http"
 
 type RouteContext = { params: Promise<{ tripId: string }> }
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import * as XLSX from "xlsx"
 import { prisma } from "@/lib/prisma"
 import { validateServiceRequest } from "@/lib/service-auth"
-import { serverErrorResponse, unauthorizedResponse } from "@/lib/http"
+import { badRequestResponse, serverErrorResponse, unauthorizedResponse } from "@/lib/http"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
