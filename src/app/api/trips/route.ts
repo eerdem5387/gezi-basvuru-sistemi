@@ -41,6 +41,11 @@ export async function GET(request: NextRequest) {
 
     const trips = await prisma.trip.findMany({
       where,
+      include: {
+        _count: {
+          select: { applications: true },
+        },
+      },
       orderBy: {
         startDate: "asc",
       },
@@ -122,6 +127,11 @@ export async function POST(request: NextRequest) {
           price: data.price ?? null,
           quota: data.quota ?? null,
           isActive: data.isActive ?? true,
+        },
+        include: {
+          _count: {
+            select: { applications: true },
+          },
         },
       })
 

@@ -160,6 +160,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       const trip = await prisma.trip.update({
         where: { id: tripId },
         data: updateData,
+        include: {
+          _count: {
+            select: { applications: true },
+          },
+        },
       })
 
       const response = NextResponse.json({ data: trip })
