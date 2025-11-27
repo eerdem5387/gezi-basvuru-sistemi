@@ -1,0 +1,50 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Trip {
+  id          String             @id @default(cuid())
+  title       String
+  description String?
+  extraNotes  String?
+  location    String
+  startDate   DateTime
+  endDate     DateTime
+  price       Decimal?           @db.Decimal(10, 2)
+  quota       Int?
+  isActive    Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  applications TripApplication[]
+
+  @@index([isActive, startDate])
+}
+
+model TripApplication {
+  id              String             @id @default(cuid())
+  tripId          String
+  trip            Trip               @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  ogrenciAdSoyad  String
+  veliAdSoyad     String
+  ogrenciSinifi   String
+  veliTelefon     String
+  ogrenciTelefon  String
+  status          ApplicationStatus  @default(PENDING)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([tripId, createdAt])
+  @@index([ogrenciSinifi])
+}
+
+enum ApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
