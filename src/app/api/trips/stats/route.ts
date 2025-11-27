@@ -6,7 +6,7 @@ import { serverErrorResponse, unauthorizedResponse } from "@/lib/http"
 export async function GET(request: NextRequest) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const now = new Date()
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         }),
       ])
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       data: {
         totalTrips,
         activeTrips,
@@ -40,8 +40,25 @@ export async function GET(request: NextRequest) {
         monthlyApplications,
       },
     })
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+      response.headers.set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Service-Secret"
+      )
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+    }
+    return response
   } catch (error) {
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 

@@ -12,7 +12,7 @@ type RouteContext = { params: Promise<{ tripId: string }> }
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const { tripId } = await context.params
@@ -21,7 +21,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
     })
 
     if (!trip) {
-      return NextResponse.json({ error: "Gezi bulunamadı" }, { status: 404 })
+      const response = NextResponse.json({ error: "Gezi bulunamadı" }, { status: 404 })
+      const origin = request.headers.get("origin")
+      const allowedOrigins = [
+        "https://okul-yonetim-sistemi.vercel.app",
+        "https://yonetim.leventokullari.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+      ]
+      if (origin && allowedOrigins.includes(origin)) {
+        response.headers.set("Access-Control-Allow-Origin", origin)
+        response.headers.set("Access-Control-Allow-Credentials", "true")
+      }
+      return response
     }
 
     const applications = await prisma.tripApplication.findMany({
@@ -47,16 +59,31 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" })
     const filename = `gezi-${trip.title.replace(/\s+/g, "-").toLowerCase()}-basvurular.xlsx`
 
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+
+    const headers: Record<string, string> = {
+      "Content-Type":
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="${filename}"`,
+    }
+
+    if (origin && allowedOrigins.includes(origin)) {
+      headers["Access-Control-Allow-Origin"] = origin
+      headers["Access-Control-Allow-Credentials"] = "true"
+    }
+
     return new NextResponse(buffer, {
       status: 200,
-      headers: {
-        "Content-Type":
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${filename}"`,
-      },
+      headers,
     })
   } catch (error) {
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 

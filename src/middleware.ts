@@ -12,18 +12,44 @@ const ALLOWED_ORIGINS = [
     : []),
 ]
 
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false
+  return ALLOWED_ORIGINS.includes(origin)
+}
+
 export function middleware(request: NextRequest) {
   const origin = request.headers.get("origin")
-  const isAllowedOrigin = origin && ALLOWED_ORIGINS.includes(origin)
+  const isAllowed = isOriginAllowed(origin)
 
   // CORS headers for API routes
   if (request.nextUrl.pathname.startsWith("/api")) {
-    const response = NextResponse.next()
-
-    if (isAllowedOrigin) {
-      response.headers.set("Access-Control-Allow-Origin", origin)
+    // Handle preflight requests
+    if (request.method === "OPTIONS") {
+      const response = new NextResponse(null, { status: 200 })
+      
+      if (isAllowed && origin) {
+        response.headers.set("Access-Control-Allow-Origin", origin)
+      }
+      
+      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+      response.headers.set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Service-Secret"
+      )
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+      response.headers.set("Access-Control-Max-Age", "86400")
+      
+      return response
     }
 
+    // For actual requests, we need to add headers to the response
+    // We'll use a custom header to pass the origin info to route handlers
+    const response = NextResponse.next()
+    
+    if (isAllowed && origin) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+    }
+    
     response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
     response.headers.set(
       "Access-Control-Allow-Headers",
@@ -31,14 +57,6 @@ export function middleware(request: NextRequest) {
     )
     response.headers.set("Access-Control-Allow-Credentials", "true")
     response.headers.set("Access-Control-Max-Age", "86400")
-
-    // Handle preflight requests
-    if (request.method === "OPTIONS") {
-      return new NextResponse(null, {
-        status: 200,
-        headers: response.headers,
-      })
-    }
 
     return response
   }

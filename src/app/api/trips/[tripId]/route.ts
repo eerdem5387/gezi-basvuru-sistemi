@@ -17,7 +17,7 @@ async function resolveTripId(context: RouteContext) {
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const tripId = await resolveTripId(context)
@@ -31,19 +31,43 @@ export async function GET(request: NextRequest, context: RouteContext) {
     })
 
     if (!trip) {
-      return NextResponse.json({ error: "Gezi bulunamadı" }, { status: 404 })
+      const response = NextResponse.json({ error: "Gezi bulunamadı" }, { status: 404 })
+      const origin = request.headers.get("origin")
+      const allowedOrigins = [
+        "https://okul-yonetim-sistemi.vercel.app",
+        "https://yonetim.leventokullari.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+      ]
+      if (origin && allowedOrigins.includes(origin)) {
+        response.headers.set("Access-Control-Allow-Origin", origin)
+        response.headers.set("Access-Control-Allow-Credentials", "true")
+      }
+      return response
     }
 
-    return NextResponse.json({ data: trip })
+    const response = NextResponse.json({ data: trip })
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+    }
+    return response
   } catch (error) {
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 
 export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const tripId = await resolveTripId(context)
@@ -51,7 +75,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     const parsed = updateTripSchema.safeParse(payload)
 
     if (!parsed.success) {
-      return badRequestResponse("Gezi verisi doğrulanamadı", parsed.error.flatten())
+      return badRequestResponse("Gezi verisi doğrulanamadı", parsed.error.flatten(), request)
     }
 
     const data = parsed.data
@@ -86,7 +110,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
 
     if (Object.keys(updateData).length === 0) {
-      return badRequestResponse("Güncellenecek alan bulunamadı")
+      return badRequestResponse("Güncellenecek alan bulunamadı", undefined, request)
     }
 
     const trip = await prisma.trip.update({
@@ -94,7 +118,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       data: updateData,
     })
 
-    return NextResponse.json({ data: trip })
+    const response = NextResponse.json({ data: trip })
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+    }
+    return response
   } catch (error) {
     if (
       typeof error === "object" &&
@@ -102,9 +138,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       "code" in error &&
       error.code === "P2025"
     ) {
-      return NextResponse.json({ error: "Gezi bulunamadı" }, { status: 404 })
+      const response = NextResponse.json({ error: "Gezi bulunamadı" }, { status: 404 })
+      const origin = request.headers.get("origin")
+      const allowedOrigins = [
+        "https://okul-yonetim-sistemi.vercel.app",
+        "https://yonetim.leventokullari.com",
+        "http://localhost:3000",
+        "http://localhost:3001",
+      ]
+      if (origin && allowedOrigins.includes(origin)) {
+        response.headers.set("Access-Control-Allow-Origin", origin)
+        response.headers.set("Access-Control-Allow-Credentials", "true")
+      }
+      return response
     }
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 

@@ -9,7 +9,7 @@ type RouteContext = { params: Promise<{ tripId: string }> }
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const { tripId } = await context.params
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       prisma.tripApplication.count({ where }),
     ])
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       data: applications,
       pagination: {
         page,
@@ -49,8 +49,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
         totalPages: Math.ceil(total / limit),
       },
     })
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+    }
+    return response
   } catch (error) {
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 

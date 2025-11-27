@@ -12,7 +12,7 @@ import {
 export async function GET(request: NextRequest) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const { searchParams } = new URL(request.url)
@@ -46,23 +46,40 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ data: trips })
+    const response = NextResponse.json({ data: trips })
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+      response.headers.set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Service-Secret"
+      )
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+    }
+    return response
   } catch (error) {
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
     if (!validateServiceRequest(request)) {
-      return unauthorizedResponse()
+      return unauthorizedResponse(request)
     }
 
     const payload = await request.json()
     const parsed = createTripSchema.safeParse(payload)
 
     if (!parsed.success) {
-      return badRequestResponse("Gezi verisi doğrulanamadı", parsed.error.flatten())
+      return badRequestResponse("Gezi verisi doğrulanamadı", parsed.error.flatten(), request)
     }
 
     const data = parsed.data
@@ -81,9 +98,26 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ data: trip }, { status: 201 })
+    const response = NextResponse.json({ data: trip }, { status: 201 })
+    const origin = request.headers.get("origin")
+    const allowedOrigins = [
+      "https://okul-yonetim-sistemi.vercel.app",
+      "https://yonetim.leventokullari.com",
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ]
+    if (origin && allowedOrigins.includes(origin)) {
+      response.headers.set("Access-Control-Allow-Origin", origin)
+      response.headers.set("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS")
+      response.headers.set(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Service-Secret"
+      )
+      response.headers.set("Access-Control-Allow-Credentials", "true")
+    }
+    return response
   } catch (error) {
-    return serverErrorResponse(error)
+    return serverErrorResponse(error, request)
   }
 }
 
