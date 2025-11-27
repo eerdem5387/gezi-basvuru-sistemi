@@ -53,6 +53,7 @@ export default function HomePage() {
     } else {
       setStudents([])
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm])
 
   const fetchActiveTrip = async () => {
@@ -77,8 +78,13 @@ export default function HomePage() {
 
   const fetchStudents = async (search: string) => {
     try {
-      const YONETIM_API_URL = process.env.NEXT_PUBLIC_YONETIM_API_URL || "https://yonetim.leventokullari.com"
-      const response = await fetch(`${YONETIM_API_URL}/api/students/public?search=${encodeURIComponent(search)}`)
+      // Use environment variable or fallback to production URL
+      // In Next.js, NEXT_PUBLIC_ variables are available in client components
+      const YONETIM_API_URL = "https://yonetim.leventokullari.com"
+
+      const response = await fetch(
+        `${YONETIM_API_URL}/api/students/public?search=${encodeURIComponent(search)}`
+      )
       if (!response.ok) {
         throw new Error("Öğrenci listesi alınamadı")
       }
@@ -122,10 +128,10 @@ export default function HomePage() {
     if (!formData.ogrenciSinifi) {
       newErrors.ogrenciSinifi = "Öğrenci sınıfı zorunludur"
     }
-    if (!formData.veliTelefon.match(/^5\d{9}$/)) {
+    if (!formData.veliTelefon || !formData.veliTelefon.match(/^5\d{9}$/)) {
       newErrors.veliTelefon = "Veli telefonu 10 haneli olmalıdır (5 ile başlamalı)"
     }
-    if (!formData.ogrenciTelefon.match(/^5\d{9}$/)) {
+    if (!formData.ogrenciTelefon || !formData.ogrenciTelefon.match(/^5\d{9}$/)) {
       newErrors.ogrenciTelefon = "Öğrenci telefonu 10 haneli olmalıdır (5 ile başlamalı)"
     }
 
