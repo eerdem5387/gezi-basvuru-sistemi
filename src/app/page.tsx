@@ -1,44 +1,450 @@
+"use client"
+
+import { useState, useEffect } from "react"
+
+interface Trip {
+  id: string
+  title: string
+  description: string | null
+  extraNotes: string | null
+  location: string
+  startDate: string
+  endDate: string
+  price: number | null
+  quota: number | null
+  isActive: boolean
+}
+
+interface Student {
+  id: string
+  fullName: string
+  grade: string
+  tcNumber: string
+}
+
 export default function HomePage() {
+  const [activeTrip, setActiveTrip] = useState<Trip | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [students, setStudents] = useState<Student[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
+  const [showStudentList, setShowStudentList] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [formData, setFormData] = useState({
+    ogrenciAdSoyad: "",
+    veliAdSoyad: "",
+    ogrenciSinifi: "",
+    veliTelefon: "",
+    ogrenciTelefon: "",
+  })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    fetchActiveTrip()
+  }, [])
+
+  useEffect(() => {
+    if (searchTerm.length >= 2) {
+      const timeoutId = setTimeout(() => {
+        fetchStudents(searchTerm)
+      }, 300)
+      return () => clearTimeout(timeoutId)
+    } else {
+      setStudents([])
+    }
+  }, [searchTerm])
+
+  const fetchActiveTrip = async () => {
+    try {
+      setLoading(true)
+      const response = await fetch("/api/trips/public")
+      if (!response.ok) {
+        throw new Error("Geziler alınamadı")
+      }
+      const result = await response.json()
+      const trips = result.data || []
+      // İlk aktif geziyi al
+      if (trips.length > 0) {
+        setActiveTrip(trips[0])
+      }
+    } catch (error) {
+      console.error("Error fetching active trip:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchStudents = async (search: string) => {
+    try {
+      const YONETIM_API_URL = process.env.NEXT_PUBLIC_YONETIM_API_URL || "https://yonetim.leventokullari.com"
+      const response = await fetch(`${YONETIM_API_URL}/api/students/public?search=${encodeURIComponent(search)}`)
+      if (!response.ok) {
+        throw new Error("Öğrenci listesi alınamadı")
+      }
+      const result = await response.json()
+      setStudents(result.data || [])
+    } catch (error) {
+      console.error("Error fetching students:", error)
+      setStudents([])
+    }
+  }
+
+  const handleStudentSelect = (student: Student) => {
+    setSelectedStudent(student)
+    // Extract grade number from grade string (e.g., "5. Sınıf" -> "5")
+    const gradeMatch = student.grade.match(/\d+/)
+    const gradeNumber = gradeMatch ? gradeMatch[0] : ""
+    
+    setFormData({
+      ...formData,
+      ogrenciAdSoyad: student.fullName,
+      ogrenciSinifi: gradeNumber,
+    })
+    setSearchTerm("")
+    setStudents([])
+    setShowStudentList(false)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrors({})
+    setSuccess(false)
+
+    // Validation
+    const newErrors: Record<string, string> = {}
+    if (!formData.ogrenciAdSoyad.trim()) {
+      newErrors.ogrenciAdSoyad = "Öğrenci adı soyadı zorunludur"
+    }
+    if (!formData.veliAdSoyad.trim()) {
+      newErrors.veliAdSoyad = "Veli adı soyadı zorunludur"
+    }
+    if (!formData.ogrenciSinifi) {
+      newErrors.ogrenciSinifi = "Öğrenci sınıfı zorunludur"
+    }
+    if (!formData.veliTelefon.match(/^5\d{9}$/)) {
+      newErrors.veliTelefon = "Veli telefonu 10 haneli olmalıdır (5 ile başlamalı)"
+    }
+    if (!formData.ogrenciTelefon.match(/^5\d{9}$/)) {
+      newErrors.ogrenciTelefon = "Öğrenci telefonu 10 haneli olmalıdır (5 ile başlamalı)"
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+
+    if (!activeTrip) {
+      setErrors({ submit: "Aktif gezi bulunamadı" })
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const response = await fetch("/api/applications", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tripId: activeTrip.id,
+          ...formData,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || "Başvuru gönderilemedi")
+      }
+
+      setSuccess(true)
+      setFormData({
+        ogrenciAdSoyad: "",
+        veliAdSoyad: "",
+        ogrenciSinifi: "",
+        veliTelefon: "",
+        ogrenciTelefon: "",
+      })
+      setSelectedStudent(null)
+    } catch (error) {
+      console.error("Error submitting application:", error)
+      setErrors({
+        submit: error instanceof Error ? error.message : "Başvuru gönderilemedi",
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Yükleniyor...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (!activeTrip) {
+    return (
+      <main className="min-h-screen bg-slate-50">
+        <section className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-16 text-slate-900">
+          <div className="text-center">
+            <h1 className="text-3xl font-semibold text-slate-900 mb-4">
+              Gezi Başvuru Sistemi
+            </h1>
+            <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <p className="text-lg text-slate-700 leading-relaxed">
+                Şu anda düzenlenmiş bir gezi bulunmamaktadır. Planlanmış gezi olup olmadığına
+                dair bilgiye ulaşmak için okulumuzla iletişime geçebilirsiniz.
+              </p>
+              <p className="mt-4 text-xl font-semibold text-slate-900">Levent Kolej</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-slate-50">
       <section className="mx-auto flex max-w-3xl flex-col gap-6 px-6 py-16 text-slate-900">
-        <div>
-          <p className="text-sm uppercase tracking-wide text-slate-500">
-            Gezi Başvuru Sistemi
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-900">
-            Okul gezileri için modern başvuru deneyimi
-          </h1>
-        </div>
-        <p className="text-lg text-slate-600">
-          Bu servis, veliler için güvenli başvuru süreçleri sunarken,
-          yönetim paneli tarafında gezileri oluşturma, pasife alma ve gelen
-          başvuruları raporlama ihtiyaçlarına özel API&apos;ler sağlar.
-        </p>
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h2 className="text-xl font-semibold text-slate-900 mb-4">
-            API Endpoints
-          </h2>
-          <ul className="space-y-2 text-slate-600">
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">GET /api/trips</code> - Gezileri listele</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">POST /api/trips</code> - Yeni gezi oluştur</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">GET /api/trips/[id]</code> - Gezi detayı</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">PATCH /api/trips/[id]</code> - Gezi güncelle</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">GET /api/trips/[id]/applications</code> - Başvuruları listele</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">GET /api/trips/[id]/applications/export</code> - Excel export</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">GET /api/trips/stats</code> - İstatistikler</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">GET /api/trips/public</code> - Aktif geziler (public)</li>
-            <li>• <code className="bg-slate-100 px-2 py-1 rounded">POST /api/applications</code> - Başvuru oluştur</li>
-          </ul>
-        </div>
-        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6">
-          <h2 className="text-xl font-semibold text-blue-900 mb-2">
-            🔒 Güvenlik
-          </h2>
-          <p className="text-blue-800">
-            Tüm yönetim API&apos;leri <code className="bg-blue-100 px-2 py-1 rounded">X-Service-Secret</code> header&apos;ı ile korunmaktadır.
+        <div className="text-center">
+          <h1 className="text-3xl font-semibold text-slate-900 mb-2">{activeTrip.title}</h1>
+          <p className="text-lg text-slate-600">{activeTrip.location}</p>
+          <p className="text-sm text-slate-500 mt-2">
+            {new Date(activeTrip.startDate).toLocaleDateString("tr-TR")} -{" "}
+            {new Date(activeTrip.endDate).toLocaleDateString("tr-TR")}
           </p>
         </div>
+
+        {activeTrip.description && (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-slate-900 mb-3">Gezi Hakkında</h2>
+            <p className="text-slate-700 whitespace-pre-line">{activeTrip.description}</p>
+          </div>
+        )}
+
+        {activeTrip.extraNotes && (
+          <div className="rounded-2xl border border-blue-200 bg-blue-50 p-6">
+            <h2 className="text-xl font-semibold text-blue-900 mb-3">Önemli Notlar</h2>
+            <p className="text-blue-800 whitespace-pre-line">{activeTrip.extraNotes}</p>
+          </div>
+        )}
+
+        {success ? (
+          <div className="rounded-2xl border border-green-200 bg-green-50 p-6">
+            <h2 className="text-xl font-semibold text-green-900 mb-2">Başvuru Başarılı!</h2>
+            <p className="text-green-800">
+              Gezi başvurunuz başarıyla alınmıştır. En kısa sürede size dönüş yapılacaktır.
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-slate-900 mb-6">Gezi Başvuru Formu</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Öğrenci Seçimi */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Öğrenci Seçimi (Opsiyonel)
+                </label>
+                <p className="text-xs text-slate-500 mb-2">
+                  Öğrenci adı soyadı ile arayarak listeden seçebilirsiniz. Seçmezseniz manuel olarak girebilirsiniz.
+                </p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Öğrenci adı soyadı ile arayın..."
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value)
+                      setShowStudentList(true)
+                      if (!e.target.value) {
+                        setSelectedStudent(null)
+                        setFormData((prev) => ({ ...prev, ogrenciAdSoyad: "", ogrenciSinifi: "" }))
+                      }
+                    }}
+                    onFocus={() => {
+                      if (searchTerm.length >= 2) {
+                        setShowStudentList(true)
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay to allow click event to fire
+                      setTimeout(() => setShowStudentList(false), 200)
+                    }}
+                    className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                  {showStudentList && students.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {students.map((student) => (
+                        <button
+                          key={student.id}
+                          type="button"
+                          onMouseDown={(e) => {
+                            e.preventDefault()
+                            handleStudentSelect(student)
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-b-0"
+                        >
+                          <div className="font-medium text-slate-900">{student.fullName}</div>
+                          <div className="text-sm text-slate-500">{student.grade}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {showStudentList && searchTerm.length >= 2 && students.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4">
+                      <p className="text-sm text-slate-500">Öğrenci bulunamadı</p>
+                    </div>
+                  )}
+                </div>
+                {selectedStudent && (
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-700">
+                      <span className="font-medium">Seçili:</span> {selectedStudent.fullName} ({selectedStudent.grade})
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedStudent(null)
+                        setFormData((prev) => ({ ...prev, ogrenciAdSoyad: "", ogrenciSinifi: "" }))
+                        setSearchTerm("")
+                      }}
+                      className="mt-1 text-xs text-green-600 hover:text-green-800 underline"
+                    >
+                      Seçimi kaldır
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Öğrenci Adı Soyadı */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Öğrenci Adı Soyadı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.ogrenciAdSoyad}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ogrenciAdSoyad: e.target.value })
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                {errors.ogrenciAdSoyad && (
+                  <p className="mt-1 text-sm text-red-600">{errors.ogrenciAdSoyad}</p>
+                )}
+              </div>
+
+              {/* Öğrenci Sınıfı */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Öğrenci Sınıfı <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={formData.ogrenciSinifi}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ogrenciSinifi: e.target.value })
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                >
+                  <option value="">Sınıf Seçiniz</option>
+                  <option value="5">5. Sınıf</option>
+                  <option value="6">6. Sınıf</option>
+                  <option value="7">7. Sınıf</option>
+                  <option value="8">8. Sınıf</option>
+                  <option value="9">9. Sınıf</option>
+                  <option value="10">10. Sınıf</option>
+                  <option value="11">11. Sınıf</option>
+                  <option value="12">12. Sınıf</option>
+                </select>
+                {errors.ogrenciSinifi && (
+                  <p className="mt-1 text-sm text-red-600">{errors.ogrenciSinifi}</p>
+                )}
+              </div>
+
+              {/* Veli Adı Soyadı */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Veli Adı Soyadı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.veliAdSoyad}
+                  onChange={(e) =>
+                    setFormData({ ...formData, veliAdSoyad: e.target.value })
+                  }
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                {errors.veliAdSoyad && (
+                  <p className="mt-1 text-sm text-red-600">{errors.veliAdSoyad}</p>
+                )}
+              </div>
+
+              {/* Veli Telefon */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Veli Telefon <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="5XXXXXXXXX"
+                  value={formData.veliTelefon}
+                  onChange={(e) =>
+                    setFormData({ ...formData, veliTelefon: e.target.value.replace(/\D/g, "") })
+                  }
+                  maxLength={10}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                {errors.veliTelefon && (
+                  <p className="mt-1 text-sm text-red-600">{errors.veliTelefon}</p>
+                )}
+              </div>
+
+              {/* Öğrenci Telefon */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Öğrenci Telefon <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  placeholder="5XXXXXXXXX"
+                  value={formData.ogrenciTelefon}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ogrenciTelefon: e.target.value.replace(/\D/g, "") })
+                  }
+                  maxLength={10}
+                  required
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+                {errors.ogrenciTelefon && (
+                  <p className="mt-1 text-sm text-red-600">{errors.ogrenciTelefon}</p>
+                )}
+              </div>
+
+              {errors.submit && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-4">
+                  <p className="text-sm text-red-600">{errors.submit}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-blue-300 disabled:cursor-not-allowed"
+              >
+                {submitting ? "Gönderiliyor..." : "Başvuruyu Gönder"}
+              </button>
+            </form>
+          </div>
+        )}
       </section>
     </main>
   )
