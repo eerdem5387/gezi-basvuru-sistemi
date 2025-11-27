@@ -191,7 +191,7 @@ export default function GeziPage() {
     fetchStats()
   }, [fetchTrips, fetchStats])
 
-  const handleSelectTrip = async (trip: Trip) {
+  const handleSelectTrip = async (trip: Trip) => {
     setSelectedTrip(trip)
     await fetchTripDetail(trip.id)
     await fetchApplications(trip.id)
