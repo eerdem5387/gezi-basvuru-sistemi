@@ -143,7 +143,11 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     
     if (Object.prototype.hasOwnProperty.call(data, "price")) {
-      updateData.price = data.price ?? null
+      if (data.price !== null && data.price !== undefined) {
+        updateData.price = new Prisma.Decimal(data.price)
+      } else {
+        updateData.price = null
+      }
     }
     if (Object.prototype.hasOwnProperty.call(data, "quota")) {
       updateData.quota = data.quota ?? null

@@ -124,18 +124,26 @@ export async function POST(request: NextRequest) {
           location: data.location.trim(),
           startDate,
           endDate,
-          price: data.price ?? null,
+          price: data.price !== null && data.price !== undefined ? new Prisma.Decimal(data.price) : null,
           quota: data.quota ?? null,
           isActive: data.isActive ?? true,
         },
-        include: {
-          _count: {
-            select: { applications: true },
-          },
-        },
       })
 
-      const response = NextResponse.json({ data: trip }, { status: 201 })
+      // Get application count separately
+      const applicationCount = await prisma.tripApplication.count({
+        where: { tripId: trip.id },
+      })
+
+      // Add _count to trip object
+      const tripWithCount = {
+        ...trip,
+        _count: {
+          applications: applicationCount,
+        },
+      }
+
+      const response = NextResponse.json({ data: tripWithCount }, { status: 201 })
       const origin = request.headers.get("origin")
       const allowedOrigins = [
         "https://okul-yonetim-sistemi.vercel.app",
@@ -154,7 +162,8 @@ export async function POST(request: NextRequest) {
       }
       return response
     } catch (dbError) {
-      console.error("Database error:", dbError)
+      console.error("Database error creating trip:", dbError)
+      console.error("Error details:", JSON.stringify(dbError, null, 2))
       // Check for unique constraint violations
       if (
         typeof dbError === "object" &&
@@ -164,10 +173,14 @@ export async function POST(request: NextRequest) {
       ) {
         return badRequestResponse("Bu gezi zaten mevcut", undefined, request)
       }
-      throw dbError
+      // Return more detailed error for debugging
+      const errorMessage = dbError instanceof Error ? dbError.message : "Veritabanı hatası"
+      console.error("Full error:", errorMessage)
+      return badRequestResponse(`Gezi oluşturulamadı: ${errorMessage}`, undefined, request)
     }
   } catch (error) {
     console.error("Error creating trip:", error)
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace")
     return serverErrorResponse(error, request)
   }
 }
