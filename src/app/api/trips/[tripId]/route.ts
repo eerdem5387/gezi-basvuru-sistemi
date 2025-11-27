@@ -8,18 +8,21 @@ import {
   unauthorizedResponse,
 } from "@/lib/http"
 
-interface RouteParams {
-  params: { tripId: string }
+type RouteContext = { params: Promise<{ tripId: string }> }
+
+async function resolveTripId(context: RouteContext) {
+  return (await context.params).tripId
 }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
       return unauthorizedResponse()
     }
 
+    const tripId = await resolveTripId(context)
     const trip = await prisma.trip.findUnique({
-      where: { id: params.tripId },
+      where: { id: tripId },
       include: {
         _count: {
           select: { applications: true },
@@ -37,12 +40,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
       return unauthorizedResponse()
     }
 
+    const tripId = await resolveTripId(context)
     const payload = await request.json()
     const parsed = updateTripSchema.safeParse(payload)
 
@@ -86,7 +90,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const trip = await prisma.trip.update({
-      where: { id: params.tripId },
+      where: { id: tripId },
       data: updateData,
     })
 

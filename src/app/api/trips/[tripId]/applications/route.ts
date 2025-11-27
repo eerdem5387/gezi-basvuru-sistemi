@@ -4,25 +4,22 @@ import { prisma } from "@/lib/prisma"
 import { validateServiceRequest } from "@/lib/service-auth"
 import { serverErrorResponse, unauthorizedResponse } from "@/lib/http"
 
-interface RouteParams {
-  params: { tripId: string }
-}
+type RouteContext = { params: Promise<{ tripId: string }> }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
       return unauthorizedResponse()
     }
 
+    const { tripId } = await context.params
     const { searchParams } = new URL(request.url)
     const page = Number(searchParams.get("page") ?? "1")
     const limit = Math.min(Number(searchParams.get("limit") ?? "20"), 100)
     const skip = (page - 1) * limit
     const search = searchParams.get("q")
 
-    const where: Prisma.TripApplicationWhereInput = {
-      tripId: params.tripId,
-    }
+    const where: Prisma.TripApplicationWhereInput = { tripId }
 
     if (search) {
       where.OR = [

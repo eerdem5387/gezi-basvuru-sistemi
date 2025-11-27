@@ -7,18 +7,17 @@ import { serverErrorResponse, unauthorizedResponse } from "@/lib/http"
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
 
-interface RouteParams {
-  params: { tripId: string }
-}
+type RouteContext = { params: Promise<{ tripId: string }> }
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest, context: RouteContext) {
   try {
     if (!validateServiceRequest(request)) {
       return unauthorizedResponse()
     }
 
+    const { tripId } = await context.params
     const trip = await prisma.trip.findUnique({
-      where: { id: params.tripId },
+      where: { id: tripId },
     })
 
     if (!trip) {
@@ -26,7 +25,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const applications = await prisma.tripApplication.findMany({
-      where: { tripId: params.tripId },
+      where: { tripId },
       orderBy: { createdAt: "asc" },
     })
 
