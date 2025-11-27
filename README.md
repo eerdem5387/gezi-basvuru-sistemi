@@ -1,66 +1,48 @@
-# 🚌 Gezi Başvuru Sistemi
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-Okul gezileri için başvuru toplayan, başvuruları raporlayan ve okul yönetim paneliyle headless API üzerinden konuşan Next.js tabanlı servis.
+## Environment Variables
 
-## 🚀 Teknolojiler
+Add the following variables to your `.env.local` (and Vercel project) to enable gezi entegrasyonu:
 
-- Next.js 16 (App Router)
-- React 19 + TypeScript
-- Prisma ORM + PostgreSQL (Neon)
-- Tailwind CSS
-- Zod ile validation
-- XLSX export
+```
+GEZI_SERVICE_URL=https://gezi-basvuru-sistemi.vercel.app
+SERVICE_API_SECRET=3QrT/eFINjbCQUZgVqUJa9k7XPHNgU9Cjg22oJwIoFQ=
+```
 
-## 📦 Scriptler
+The secret must match the value configured inside `gezi-basvuru-sistemi`, otherwise servis çağrıları reddedilir.
+
+## Getting Started
+
+First, run the development server:
 
 ```bash
-npm install
 npm run dev
-npm run build
-npm run db:push
-npm run db:migrate
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-## 🔐 Servisler Arası Güvenlik
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-Okul yönetim panelinden gelen tüm yönetim çağrıları `X-Service-Secret` (veya `Authorization: Bearer ...`) başlığı ile doğrulanır. `SERVICE_API_SECRET` her iki projede aynı olmalıdır.
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## 🗃️ Prisma Modelleri
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-- `Trip`: Gezi meta verileri (ek açıklama alanı dahil)
-- `TripApplication`: Öğrenci başvuruları
+## Learn More
 
-## 🔗 API Yüzeyi
+To learn more about Next.js, take a look at the following resources:
 
-| Endpoint | Açıklama | Auth |
-| --- | --- | --- |
-| `POST /api/trips` | Gezi oluştur | ✅ |
-| `GET /api/trips` | Gezi listesini getir (filtrelenebilir) | ✅ |
-| `GET /api/trips/:id` | Gezi detay + başvuru sayısı | ✅ |
-| `PATCH /api/trips/:id` | Gezi düzenleme / aktif-pasif | ✅ |
-| `GET /api/trips/:id/applications` | Başvuru listesi (pagination) | ✅ |
-| `GET /api/trips/:id/applications/export` | Excel export | ✅ |
-| `GET /api/trips/stats` | Panel kartları için sayısal veriler | ✅ |
-| `GET /api/trips/public` | Aktif gezileri getir (veliler için) | ❌ |
-| `POST /api/applications` | Başvuru oluştur (öğrenci & veli bilgileri) | ❌ |
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-### Başvuru formu alanları
-- Öğrenci Ad Soyad (zorunlu)
-- Veli Ad Soyad (zorunlu)
-- Öğrencinin Sınıfı (5-12 seçenekli)
-- Veli Telefonu (5XXXXXXXXX formatı)
-- Öğrenci Telefonu (5XXXXXXXXX formatı)
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
 
-## 📄 Environment Variables
+## Deploy on Vercel
 
-```
-DATABASE_URL=postgresql://...
-SERVICE_API_SECRET=super-secret
-```
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-## 🧭 Sonraki Adımlar
-
-- Yönetim paneli ile entegrasyon (okul-yonetim-sistemi)
-- Public başvuru formu arayüzü
-- Queue / retry mekanizmaları (gerektiğinde)
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
