@@ -150,12 +150,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
     }
     
     if (Object.prototype.hasOwnProperty.call(data, "price")) {
-      if (data.price !== null && data.price !== undefined && data.price !== "") {
-        try {
-          updateData.price = new Prisma.Decimal(String(data.price))
-        } catch (decimalError) {
-          console.error("Error converting price to Decimal:", decimalError)
-          return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+      const priceValue = data.price
+      if (priceValue !== null && priceValue !== undefined) {
+        // Check if it's an empty string (from form submission)
+        const priceStr = String(priceValue).trim()
+        if (priceStr !== "" && priceStr !== "null" && priceStr !== "undefined") {
+          try {
+            updateData.price = new Prisma.Decimal(priceStr)
+          } catch (decimalError) {
+            console.error("Error converting price to Decimal:", decimalError)
+            return badRequestResponse("Geçersiz ücret formatı", undefined, request)
+          }
+        } else {
+          updateData.price = null
         }
       } else {
         updateData.price = null
