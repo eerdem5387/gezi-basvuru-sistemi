@@ -46,13 +46,16 @@ export default function HomePage() {
   }, [])
 
   useEffect(() => {
-    if (searchTerm.length >= 2) {
+    // TC numarası 11 haneli olmalı
+    const cleanedTc = searchTerm.replace(/\D/g, "") // Sadece rakamları al
+    if (cleanedTc.length === 11) {
       const timeoutId = setTimeout(() => {
-        fetchStudents(searchTerm)
-      }, 300)
+        fetchStudents(cleanedTc)
+      }, 500) // TC numarası tamamlandıktan sonra biraz bekle
       return () => clearTimeout(timeoutId)
     } else {
       setStudents([])
+      setStudentSearchError(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm])
@@ -77,8 +80,14 @@ export default function HomePage() {
     }
   }
 
-  const fetchStudents = async (search: string) => {
+  const fetchStudents = async (tcNumber: string) => {
     try {
+      // TC numarası validasyonu
+      if (!tcNumber || tcNumber.length !== 11 || !/^\d{11}$/.test(tcNumber)) {
+        setStudents([])
+        return
+      }
+
       // Try multiple API URLs as fallback
       const apiUrls = [
         process.env.NEXT_PUBLIC_YONETIM_API_URL,
@@ -95,7 +104,7 @@ export default function HomePage() {
           const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
           
           const response = await fetch(
-            `${apiUrl}/api/students/public?search=${encodeURIComponent(search)}`,
+            `${apiUrl}/api/students/public?tcNumber=${encodeURIComponent(tcNumber)}`,
             {
               method: "GET",
               headers: {
@@ -264,6 +273,22 @@ export default function HomePage() {
             {new Date(activeTrip.startDate).toLocaleDateString("tr-TR")} -{" "}
             {new Date(activeTrip.endDate).toLocaleDateString("tr-TR")}
           </p>
+          <div className="flex flex-wrap justify-center gap-4 mt-4">
+            {activeTrip.price !== null && activeTrip.price > 0 && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg">
+                <span className="text-sm font-medium text-green-700">Ücret:</span>
+                <span className="text-lg font-semibold text-green-900">
+                  {Number(activeTrip.price).toLocaleString("tr-TR")} ₺
+                </span>
+              </div>
+            )}
+            {activeTrip.quota !== null && activeTrip.quota > 0 && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <span className="text-sm font-medium text-blue-700">Kota:</span>
+                <span className="text-lg font-semibold text-blue-900">{activeTrip.quota} kişi</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {activeTrip.description && (
@@ -294,31 +319,46 @@ export default function HomePage() {
               {/* Öğrenci Seçimi */}
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Öğrenci Seçimi (Opsiyonel)
+                  Öğrenci Seçimi
                 </label>
                 <p className="text-xs text-slate-500 mb-2">
-                  Öğrenci adı soyadı ile arayarak listeden seçebilirsiniz. Seçmezseniz manuel olarak girebilirsiniz.
+                  Öğrenci TC kimlik numarası ile arayarak listeden seçebilirsiniz. KVKK gereği sadece TC numarası ile arama yapılabilir. Seçmezseniz manuel olarak girebilirsiniz.
                 </p>
-                {studentSearchError && searchTerm.length >= 2 && (
+                {studentSearchError && searchTerm.replace(/\D/g, "").length === 11 && (
                   <p className="text-xs text-amber-600 mb-2">
-                    ⚠️ Öğrenci listesi şu anda yüklenemiyor. Lütfen bilgileri manuel olarak giriniz.
+                    ⚠️ Bu TC numarası ile kayıtlı öğrenci bulunamadı. Lütfen bilgileri manuel olarak giriniz.
+                  </p>
+                )}
+                {searchTerm && searchTerm.replace(/\D/g, "").length > 0 && searchTerm.replace(/\D/g, "").length !== 11 && (
+                  <p className="text-xs text-amber-600 mb-2">
+                    ⚠️ TC kimlik numarası 11 haneli olmalıdır.
                   </p>
                 )}
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Öğrenci adı soyadı ile arayın..."
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    placeholder="TC Kimlik Numarası (11 haneli)"
                     value={searchTerm}
+                    maxLength={11}
                     onChange={(e) => {
-                      setSearchTerm(e.target.value)
-                      setShowStudentList(true)
-                      if (!e.target.value) {
-                        setSelectedStudent(null)
-                        setFormData((prev) => ({ ...prev, ogrenciAdSoyad: "", ogrenciSinifi: "" }))
+                      // Sadece rakamları kabul et
+                      const value = e.target.value.replace(/\D/g, "")
+                      setSearchTerm(value)
+                      if (value.length === 11) {
+                        setShowStudentList(true)
+                      } else {
+                        setShowStudentList(false)
+                        setStudents([])
+                        if (!value) {
+                          setSelectedStudent(null)
+                          setFormData((prev) => ({ ...prev, ogrenciAdSoyad: "", ogrenciSinifi: "" }))
+                        }
                       }
                     }}
                     onFocus={() => {
-                      if (searchTerm.length >= 2) {
+                      if (searchTerm.replace(/\D/g, "").length === 11) {
                         setShowStudentList(true)
                       }
                     }}
@@ -346,9 +386,14 @@ export default function HomePage() {
                       ))}
                     </div>
                   )}
-                  {showStudentList && searchTerm.length >= 2 && students.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4">
-                      <p className="text-sm text-slate-500">Öğrenci bulunamadı</p>
+                  {showStudentList && searchTerm.replace(/\D/g, "").length === 11 && students.length === 0 && !studentSearchError && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4 text-center">
+                      <p className="text-sm text-slate-500">Aranıyor...</p>
+                    </div>
+                  )}
+                  {showStudentList && searchTerm.replace(/\D/g, "").length === 11 && students.length === 0 && studentSearchError && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg p-4 text-center">
+                      <p className="text-sm text-amber-600">Bu TC numarası ile kayıtlı öğrenci bulunamadı</p>
                     </div>
                   )}
                 </div>

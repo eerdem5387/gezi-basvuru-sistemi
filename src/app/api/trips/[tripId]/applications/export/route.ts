@@ -48,14 +48,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
       })
 
       const rows = applications.map((app) => ({
-        "Başvuru ID": app.id,
         "Öğrenci Adı": app.ogrenciAdSoyad,
         "Öğrenci Sınıfı": app.ogrenciSinifi,
         "Veli Adı": app.veliAdSoyad,
         "Veli Telefon": app.veliTelefon,
         "Öğrenci Telefonu": app.ogrenciTelefon,
-        Durum: app.status,
-        "Başvuru Tarihi": app.createdAt.toISOString(),
+        "Başvuru Tarihi": app.createdAt.toLocaleString("tr-TR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       }))
 
       const workbook = XLSX.utils.book_new()
